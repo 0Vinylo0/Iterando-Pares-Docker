@@ -45,8 +45,8 @@ El proyecto contiene los siguientes archivos y carpetas:
 Si el proyecto no está clonado, puedes hacerlo con:
 
 ```sh
- git clone https://github.com/0Vinylo0/Iterando-Pares-Docker
- cd Iterando-Pares-Docker
+ git clone <URL-DEL-REPO>
+ cd <CARPETA-DEL-REPO>
 ```
 
 ### 2. Construir y levantar los contenedores

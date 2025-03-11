@@ -1,0 +1,9 @@
+SocksPort 0.0.0.0:9050
+ControlPort 9051
+ExitNodes {es},{de},{nl},{fr}
+ExcludeExitNodes {ru},{cn},{ir},{pk},{nl}
+
+CircuitBuildTimeout 20
+NewCircuitPeriod 60
+MaxCircuitDirtiness 120
+StrictNodes 0

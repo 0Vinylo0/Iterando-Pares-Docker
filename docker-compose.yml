@@ -1,0 +1,55 @@
+version: '3.8'
+
+services:
+  tor:
+    image: goldy/tor-hidden-service
+    container_name: tor_service
+    volumes:
+      - ./torrc:/etc/tor/torrc.custom  # Montamos torrc con otro nombre temporal
+    entrypoint: ["/bin/sh", "-c", "cp /etc/tor/torrc.custom /etc/tor/torrc && tor"]
+    ports:
+      - "9050:9050"
+      - "9051:9051"
+    restart: unless-stopped
+    networks:
+      - iterando_network
+
+  redis:
+    image: redis:alpine
+    container_name: redis_service
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+    networks:
+      - iterando_network
+    volumes:
+      - redis_data:/data
+
+  iterando:
+    build:
+      context: ./iterando
+      dockerfile: Dockerfile
+    container_name: iterando_service
+    depends_on:
+      - tor
+      - redis
+    volumes:
+      - ./data:/app/data
+      - ./data/todo_urls.txt:/app/todo_urls.txt:ro
+      - ./data/description_data.json:/app/description_data.json
+      - ./data/img:/app/img
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - TOR_PROXY=socks5h://tor:9050
+    restart: unless-stopped
+    networks:
+      - iterando_network
+
+networks:
+  iterando_network:
+    driver: bridge
+
+volumes:
+  redis_data:
+    driver: local

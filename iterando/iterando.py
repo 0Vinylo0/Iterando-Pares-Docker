@@ -14,13 +14,11 @@ class ParesFileScraper:
     def __init__(self, base_url="https://pares.mcu.es"):
         self.base_url = base_url
         self.session = requests.Session()
-        tor_proxy = os.getenv("TOR_PROXY", "socks5h://tor:9050")  # Cambia localhost por 'tor'
         self.session.proxies = {
-            "http": tor_proxy,
-            "https": tor_proxy
+            "http": "socks5h://127.0.0.1:9050",
+            "https": "socks5h://127.0.0.1:9050"
         }
-        redis_host = os.getenv("REDIS_HOST", "redis")  # Usa el servicio Redis en Docker
-        self.r = redis.StrictRedis(host=redis_host, port=6379, db=0)
+        self.r = redis.StrictRedis(host='localhost', port=6379, db=0)  # Conexión a Redis
         self.description_file = "description_data.json"
         self.img_folder = "img"
         self.urls_description = self.load_existing_descriptions()
@@ -121,6 +119,24 @@ class ParesFileScraper:
         texto_limpio = re.sub(r'(\d+)', r' \1 ', texto_limpio).strip()
 
         return texto_limpio
+    
+    def process_find(self, url):
+        try:
+            html = self.curl_request(url, is_contiene=False)
+            time.sleep(2)
+            if not html:
+                return
+
+            soup = BeautifulSoup(html, 'html.parser')
+            desc_links = soup.find_all('a', href=re.compile(r'/description/\d+'))
+            desc_urls = [urljoin(self.base_url, link['href']) for link in desc_links]
+
+            if desc_urls:
+                print(f"Found description links in find: {desc_urls}")
+                for desc_url in desc_urls:
+                    self.r.rpush("todo_urls", desc_url)  # Añade a Redis
+        except Exception as e:
+            self.log_error(f"Error processing find URL {url}: {e}")
 
     def process_description(self, url):
         html_content = self.get_page(url)
@@ -199,7 +215,7 @@ class ParesFileScraper:
                 get_cookie_command = [
                     "curl",
                     "-sL",
-                    "-x", "socks5h://tor:9050",  # Proxy de Tor
+                    "-x", "socks5h://127.0.0.1:9050",  # Proxy de Tor
                     "-c", self.cookie_file,
                     "-H", f"User-Agent: {self.get_random_user_agent()}",
                     url
@@ -210,7 +226,7 @@ class ParesFileScraper:
                 command = [
                     "curl",
                     "-sL",
-                    "-x", "socks5h://tor:9050",  # Proxy de Tor
+                    "-x", "socks5h://127.0.0.1:9050",  # Proxy de Tor
                     "https://pares.mcu.es/ParesBusquedas20/catalogo/contiene/SearchController.do",
                     "-H", "Accept: text/html, */*; q=0.01",
                     "-H", "Accept-Language: es-ES,es;q=0.9,en;q=0.8",
@@ -233,7 +249,7 @@ class ParesFileScraper:
                 command = [
                     "curl",
                     "-sL",
-                    "-x", "socks5h://tor:9050",  # Proxy de Tor
+                    "-x", "socks5h://127.0.0.1:9050",  # Proxy de Tor
                     "-H", f"User-Agent: {self.get_random_user_agent()}",
                     url
                 ]
@@ -280,7 +296,7 @@ class ParesFileScraper:
                 command = [
                     "curl",
                     "-s",
-                    "-x", "socks5h://tor:9050",  # Proxy Tor
+                    "-x", "socks5h://127.0.0.1:9050",  # Proxy Tor
                     "-b", self.cookie_file,  # Cookies
                     "-o", img_path,  # Ruta de salida
                     "-H", f"User-Agent: {self.get_random_user_agent()}",
@@ -313,7 +329,7 @@ class ParesFileScraper:
         command = [
             "curl",
             "-s",
-            "-x", "socks5h://tor:9050",  # Proxy de Tor
+            "-x", "socks5h://127.0.0.1:9050",  # Proxy de Tor
             "-c", self.cookie_file,
             "-H", f"User-Agent: {self.get_random_user_agent()}",
             show_url
@@ -384,6 +400,8 @@ class ParesFileScraper:
                 self.process_description(url)
             elif "contiene/" in url:
                 self.process_contiene(url)
+            elif "catalogo/find" in url:
+                self.process_find(url)
             self.mark_as_done(url)
 
     def __del__(self):
@@ -392,8 +410,7 @@ class ParesFileScraper:
             os.remove(self.cookie_file)
 
 def initialize_redis(todo_file):
-    redis_host = os.getenv("REDIS_HOST", "redis")  # Usa el servicio Redis en Docker
-    r = redis.StrictRedis(host=redis_host, port=6379, db=0)
+    r = redis.StrictRedis(host='localhost', port=6379, db=0)
     
     # Verifica si la lista 'todo_urls' ya tiene elementos
     if r.llen("todo_urls") > 0:

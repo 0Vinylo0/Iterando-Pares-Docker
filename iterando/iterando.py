@@ -139,7 +139,7 @@ class ParesFileScraper:
             self.log_error(f"Error processing find URL {url}: {e}")
 
     def process_description(self, url):
-        html_content = self.get_page(url)
+        html_content = self.curl_request(url, is_contiene=False)
         if not html_content:
             return
 
@@ -168,7 +168,7 @@ class ParesFileScraper:
                 show_url = urljoin(self.base_url, show_link['href'])
                 # Obtener cookies desde la página 'show'
                 self.get_cookies_from_show(show_url)
-                show_content = self.get_page(show_url)
+                show_content = self.curl_request(show_url, is_contiene=False, referer=url)
                 if show_content:
                     dbcodes = re.findall(r'VisorController.do?.*txt_id_imagen=(\d*)&txt_rotar=0&txt_contraste=0&appOrigen=&dbCode=(\d*)', show_content)
                     img_download_links = [
@@ -246,11 +246,35 @@ class ParesFileScraper:
                     "--data-raw", "tambloque=10000&orderBy=0"
                 ]
             else:
+                get_cookie_command = [
+                    "curl",
+                    "-s",
+                    "-x", "socks5h://127.0.0.1:9050",
+                    "-c", self.cookie_file,
+                    "-H", f"User-Agent: {self.get_random_user_agent()}",
+                    url
+                ]
+                subprocess.run(get_cookie_command, capture_output=True, text=True)
+
+                # 2. Hacer curl con cabecera exacta
                 command = [
                     "curl",
                     "-sL",
-                    "-x", "socks5h://127.0.0.1:9050",  # Proxy de Tor
+                    "-x", "socks5h://127.0.0.1:9050",
+                    "-H", "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+                    "-H", "Accept-Language: es-ES,es;q=0.9,en;q=0.8",
+                    "-H", "Cache-Control: max-age=0",
+                    "-H", "Connection: keep-alive",
+                    "-H", f"Cookie: {self.get_cookies()}",
+                    "-H", "Sec-Fetch-Dest: document",
+                    "-H", "Sec-Fetch-Mode: navigate",
+                    "-H", "Sec-Fetch-Site: none",
+                    "-H", "Sec-Fetch-User: ?1",
+                    "-H", "Upgrade-Insecure-Requests: 1",
                     "-H", f"User-Agent: {self.get_random_user_agent()}",
+                    "-H", 'sec-ch-ua: "Google Chrome";v="137", "Chromium";v="137", "Not/A)Brand";v="24"',
+                    "-H", "sec-ch-ua-mobile: ?1",
+                    "-H", 'sec-ch-ua-platform: "Android"',
                     url
                 ]
             result = subprocess.run(command, capture_output=True, text=True)
